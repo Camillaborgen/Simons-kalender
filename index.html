@@ -710,17 +710,34 @@ function saveManual() {
 }
 
 function saveAI() {
-  if (!aiPay) return;
-  aiPay.recurrence = { type: 'none' };
-  addEv(aiPay);
-  // Navigate to the week/month containing the saved event so user can see it
-  if (aiPay.date) cur = new Date(aiPay.date + 'T12:00:00');
+  if (!aiPay) {
+    alert('Ingen begivenhed at gemme – prøv at analysere igen.');
+    return;
+  }
+  if (!aiPay.date) {
+    alert('AI fandt ingen dato – beskriv begivenheden igen med en dato.');
+    return;
+  }
+  // Build a clean plain object to avoid iOS Safari spread issues
+  const toSave = {
+    activity:   aiPay.activity  || 'other',
+    date:       aiPay.date,
+    timeStart:  aiPay.timeStart || '',
+    timeEnd:    aiPay.timeEnd   || '',
+    location:   aiPay.location  || '',
+    notes:      aiPay.notes     || '',
+    recurrence: { type: 'none' }
+  };
+  addEv(toSave);
+  cur = new Date(toSave.date + 'T12:00:00');
+  aiPay = null;
   closeModal();
   render();
 }
 
 function addEv(data) {
-  events.push({ id: Date.now() + Math.random().toString(36).slice(2), ...data });
+  const id = 'ev_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+  events.push(Object.assign({ id }, data));
   localStorage.setItem('kal_ev', JSON.stringify(events));
 }
 
