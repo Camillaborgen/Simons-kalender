@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Aktivitetskalender</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:    #0D1117;
+      --surf:  #161B22;
+      --surf2: #21262D;
+      --bdr:   #30363D;
+      --text:  #E6EDF3;
+      --muted: #8B949E;
+      --acc:   #FF6B35;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; overscroll-behavior: none; }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ── HEADER ── */
+    .hdr { background: var(--surf); border-bottom: 1px solid var(--bdr); padding: 10px 14px; display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 400; }
+    .logo { font-family: 'Bebas Neue', cursive; font-size: 24px; letter-spacing: 2px; flex: 1; }
+    .logo em { color: var(--acc); font-style: normal; }
+    .vtog { display: flex; background: var(--surf2); border: 1px solid var(--bdr); border-radius: 8px; overflow: hidden; }
+    .vbtn { padding: 7px 12px; font-size: 13px; font-weight: 600; background: transparent; border: none; color: var(--muted); transition: all .15s; }
+    .vbtn.on { background: var(--acc); color: #fff; }
+    .add-btn { background: var(--acc); color: #fff; border: none; border-radius: 8px; padding: 8px 13px; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 5px; transition: opacity .15s; white-space: nowrap; }
+    .add-btn:hover { opacity: .85; }
+
+    /* ── LEGEND ── */
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 9px 14px; background: var(--surf); border-bottom: 1px solid var(--bdr); position: sticky; top: 52px; z-index: 390; }
+    .li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .ldot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── NAV ── */
+    .nav { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 6px; }
+    .nbtn { background: var(--surf2); border: 1px solid var(--bdr); color: var(--text); border-radius: 7px; padding: 7px 14px; font-size: 15px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+    .nbtn:hover { background: var(--bdr); }
+    .ntitle { font-family: 'Bebas Neue', cursive; font-size: 17px; letter-spacing: .8px; text-align: center; }
+
+    /* ── MONTH VIEW ── */
+    .mwrap { padding: 0 10px 20px; overflow-x: auto; }
+    .mgrid { display: grid; grid-template-columns: 26px repeat(7, 1fr); border: 1px solid var(--bdr); border-radius: 10px; overflow: hidden; min-width: 300px; }
+    .mhdr { background: var(--surf2); text-align: center; padding: 7px 2px; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--bdr); }
+    .wkn  { background: var(--surf2); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--muted); border-right: 1px solid var(--bdr); border-bottom: 1px solid var(--bdr); }
+    .mday { background: var(--surf); min-height: 78px; padding: 4px 3px; cursor: pointer; border-right: 1px solid var(--bdr); border-bottom: 1px solid var(--bdr); transition: background .12s; overflow: hidden; }
+    .mday:hover { background: var(--surf2); }
+    .mday.dim .dnum { opacity: .25; }
+    .dnum { font-size: 12px; font-weight: 700; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-bottom: 3px; }
+    .mday.today .dnum { background: var(--acc); color: #fff; }
+    .mev { border-radius: 3px; padding: 2px 4px; font-size: 10px; font-weight: 600; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+    .mev:hover { filter: brightness(1.2); }
+    .mmore { font-size: 10px; color: var(--muted); padding: 1px 3px; }
+
+    /* ── WEEK VIEW ──
+       .wscroll  = the ONLY element with overflow:auto. Provides scroll context for all sticky children.
+       .wouter   = plain flex, NO overflow:hidden (that breaks sticky).
+       .tcol     = position:sticky; left:0  → stays visible on horizontal scroll
+       .tch      = position:sticky; top:0   → corner cell stays in place on vertical scroll
+       .dh       = position:sticky; top:0   → day names stay visible on vertical scroll
+    ── */
+    .wscroll {
+      margin: 0 10px 20px;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--bdr);
+      border-radius: 10px;
+      max-height: calc(100vh - 210px);
+    }
+    .wouter { display: flex; min-width: 500px; }
+
+    .tcol { width: 44px; flex-shrink: 0; position: sticky; left: 0; z-index: 30; background: var(--surf); border-right: 1px solid var(--bdr); }
+    .tch  { height: 52px; position: sticky; top: 0; z-index: 1; background: var(--surf2); border-bottom: 1px solid var(--bdr); }
+    .tsl  { height: 60px; border-bottom: 1px solid var(--bdr); display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 5px 0 0; font-size: 10px; color: var(--muted); }
+
+    .dcols { flex: 1; display: grid; grid-template-columns: repeat(7, minmax(52px, 1fr)); }
+    .dcol  { border-right: 1px solid var(--bdr); display: flex; flex-direction: column; }
+    .dcol:last-child { border-right: none; }
+
+    .dh { height: 52px; position: sticky; top: 0; z-index: 20; background: var(--surf2); border-bottom: 1px solid var(--bdr); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; flex-shrink: 0; }
+    .dh .dn { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+    .dh .dd { font-family: 'Bebas Neue', cursive; font-size: 19px; line-height: 1; }
+    .dh.today .dd { color: var(--acc); }
+
+    .dbody { position: relative; flex: 1; }
+    .hrow  { height: 60px; border-bottom: 1px solid var(--bdr); background: var(--surf); cursor: pointer; transition: background .1s; }
+    .hrow:hover { background: var(--surf2); }
+    .wev  { position: absolute; left: 2px; right: 2px; border-radius: 5px; padding: 3px 5px; font-size: 10px; font-weight: 600; overflow: hidden; cursor: pointer; border-left: 3px solid transparent; z-index: 2; }
+    .wev:hover { filter: brightness(1.15); z-index: 3; }
+    .wev-nm { line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wev-t  { font-size: 9px; opacity: .7; }
+
+    /* ── MODAL (bottom sheet on mobile, centred on tablet+) ── */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 500; display: flex; align-items: flex-end; justify-content: center; backdrop-filter: blur(5px); opacity: 0; pointer-events: none; transition: opacity .2s; }
+    .overlay.show { opacity: 1; pointer-events: all; }
+    .modal { background: var(--surf); border: 1px solid var(--bdr); border-radius: 16px 16px 0 0; width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; transform: translateY(30px); transition: transform .2s; padding-bottom: env(safe-area-inset-bottom, 14px); }
+    .overlay.show .modal { transform: translateY(0); }
+    @media (min-width: 520px) { .overlay { align-items: center; padding: 16px; } .modal { border-radius: 14px; max-height: 88vh; } }
+
+    .mhd  { padding: 16px 16px 0; display: flex; justify-content: space-between; align-items: center; }
+    .mttl { font-family: 'Bebas Neue', cursive; font-size: 20px; letter-spacing: 1px; }
+    .xbtn { background: var(--surf2); border: 1px solid var(--bdr); color: var(--text); border-radius: 7px; width: 32px; height: 32px; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+
+    .tabs { display: flex; gap: 5px; padding: 12px 16px 0; }
+    .tab  { flex: 1; padding: 8px 4px; background: var(--surf2); border: 1px solid var(--bdr); border-radius: 8px; color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; transition: all .15s; }
+    .tab.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+
+    .tbody { padding: 12px 16px 14px; }
+    .pnl  { display: none; }
+    .pnl.on { display: block; }
+
+    /* ── API KEY BANNER — shown prominently when key missing ── */
+    .key-banner { background: rgba(255,107,53,.1); border: 1px solid rgba(255,107,53,.4); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+    .key-banner p { font-size: 12px; color: var(--acc); margin-bottom: 8px; font-weight: 600; }
+    .key-banner input { width: 100%; background: var(--surf); border: 1px solid var(--bdr); border-radius: 8px; padding: 9px 11px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; }
+    .key-banner input:focus { outline: none; border-color: var(--acc); }
+    .key-banner small { display: block; margin-top: 5px; font-size: 11px; color: var(--muted); }
+
+    /* Form elements */
+    .fg { margin-bottom: 11px; }
+    .fg label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+    .fg input, .fg select, .fg textarea {
+      width: 100%; background: var(--surf2); border: 1px solid var(--bdr); border-radius: 8px;
+      padding: 10px 11px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+      transition: border-color .15s; -webkit-appearance: none;
+    }
+    .fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: var(--acc); }
+    .fg select option { background: #1a1d27; }
+    .r2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* Activity grid */
+    .act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .aopt { display: flex; align-items: center; gap: 6px; padding: 9px 10px; background: var(--surf2); border: 2px solid var(--bdr); border-radius: 8px; font-size: 12px; font-weight: 500; transition: all .15s; user-select: none; min-height: 44px; cursor: pointer; }
+    .aopt.sel { border-color: var(--sc, var(--acc)); color: var(--sc, var(--acc)); background: color-mix(in srgb, var(--sc, var(--acc)) 10%, var(--surf2)); }
+    .adot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Recurrence */
+    .rec-box { background: var(--surf2); border: 1px solid var(--bdr); border-radius: 8px; padding: 10px 12px; }
+    .rec-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+
+    /* Buttons */
+    .sbtn { width: 100%; padding: 12px; background: var(--acc); color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 14px; margin-top: 4px; transition: opacity .15s; }
+    .sbtn:hover { opacity: .85; }
+    .sbtn.sec { background: var(--surf2); color: var(--text); border: 1px solid var(--bdr); margin-bottom: 8px; margin-top: 0; }
+
+    /* ── UPLOAD ZONE
+       FIX: The <input type=file> is placed INSIDE the zone with
+       position:absolute; inset:0; opacity:0; cursor:pointer
+       This makes the entire zone tappable on iOS — no programmatic .click() needed.
+    ── */
+    .uzone {
+      position: relative;          /* contains the absolutely-placed input */
+      border: 2px dashed var(--bdr); border-radius: 10px;
+      padding: 26px 16px; text-align: center;
+      transition: all .15s; margin-bottom: 11px;
+      cursor: pointer;
+    }
+    .uzone:hover, .uzone.over { border-color: var(--acc); background: rgba(255,107,53,.05); }
+    .uzone input[type=file] {
+      /* Covers entire zone, invisible — most reliable cross-browser/iOS approach */
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      opacity: 0; cursor: pointer;
+      /* Must NOT be display:none or visibility:hidden — iOS ignores those */
+    }
+    .uico { font-size: 28px; margin-bottom: 5px; pointer-events: none; }
+    .utxt { font-size: 13px; color: var(--muted); pointer-events: none; }
+    .uhint { font-size: 11px; color: var(--muted); opacity: .55; margin-top: 3px; pointer-events: none; }
+    .pimg { width: 100%; max-height: 130px; object-fit: contain; border-radius: 6px; margin-bottom: 10px; display: none; }
+
+    /* AI result card */
+    .aicard { background: var(--surf2); border: 1px solid var(--bdr); border-radius: 8px; padding: 11px 12px; font-size: 13px; margin-bottom: 11px; display: none; line-height: 1.8; }
+    .aicard.show { display: block; }
+
+    /* Voice */
+    .voice-area { text-align: center; padding: 10px 0 6px; }
+    .micbtn { width: 68px; height: 68px; border-radius: 50%; background: var(--surf2); border: 3px solid var(--bdr); font-size: 26px; display: inline-flex; align-items: center; justify-content: center; transition: all .15s; margin-bottom: 8px; }
+    .micbtn.rec { background: rgba(248,81,73,.15); border-color: #F85149; animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+    .micst { font-size: 12px; color: var(--muted); margin-bottom: 10px; min-height: 18px; }
+    .divider { display: flex; align-items: center; gap: 10px; margin: 8px 0; color: var(--muted); font-size: 12px; }
+    .divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--bdr); }
+
+    /* Event popup */
+    .evpop { position: fixed; background: var(--surf); border: 1px solid var(--bdr); border-radius: 10px; padding: 13px; z-index: 600; min-width: 195px; max-width: 250px; box-shadow: 0 8px 30px rgba(0,0,0,.65); animation: popIn .15s ease; }
+    @keyframes popIn { from { opacity: 0; transform: scale(.95); } to { opacity: 1; transform: scale(1); } }
+    .ep-t  { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+    .ep-r  { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
+    .ep-rc { font-size: 11px; color: var(--muted); font-style: italic; margin: 4px 0 7px; }
+    .ep-acts { display: flex; flex-direction: column; gap: 5px; margin-top: 9px; }
+    .ep-row  { display: flex; gap: 5px; }
+    .epb { flex: 1; padding: 7px 8px; border-radius: 6px; border: 1px solid var(--bdr); background: var(--surf2); color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif; }
+    .epb.del { background: rgba(248,81,73,.12); border-color: rgba(248,81,73,.3); color: #F85149; }
+
+    .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--bdr); border-top-color: var(--acc); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 5px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="logo">📅 MIN <em>KALENDER</em></div>
+  <div class="vtog">
+    <button class="vbtn on" onclick="setView('week')">Uge</button>
+    <button class="vbtn"    onclick="setView('month')">Måned</button>
+  </div>
+  <button class="add-btn" onclick="openModal()">＋ Tilføj</button>
+</header>
+
+<!-- LEGEND -->
+<div class="legend" id="legend"></div>
+
+<!-- NAV -->
+<div class="nav">
+  <button class="nbtn" onclick="navigate(-1)">◀</button>
+  <div class="ntitle" id="ntitle"></div>
+  <button class="nbtn" onclick="navigate(1)">▶</button>
+</div>
+
+<!-- CALENDAR -->
+<div id="cal"></div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay" onclick="ocl(event)">
+  <div class="modal">
+    <div class="mhd">
+      <div class="mttl">TILFØJ BEGIVENHED</div>
+      <button class="xbtn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="tabs">
+      <button class="tab on" data-t="manual" onclick="switchTab('manual')">✏️ Manuel</button>
+      <button class="tab"    data-t="image"  onclick="switchTab('image')">📸 Billede</button>
+      <button class="tab"    data-t="voice"  onclick="switchTab('voice')">🎤 / ✍️ AI</button>
+    </div>
+    <div class="tbody">
+
+      <!-- ─── MANUEL ─── -->
+      <div class="pnl on" id="pnl-manual">
+        <div class="fg">
+          <label>Aktivitet</label>
+          <div class="act-grid" id="actgrid"></div>
+        </div>
+
+        <!-- Row: Dato (left) | Sted (right) -->
+        <div class="r2" style="margin-bottom:11px">
+          <div class="fg" style="margin:0">
+            <label>Dato</label>
+            <input type="date" id="evdate">
+          </div>
+          <div class="fg" style="margin:0">
+            <label>Sted</label>
+            <input type="text" id="evloc" placeholder="Hallen, Skolen...">
+          </div>
+        </div>
+
+        <!-- Row: Fra (left) | Til (right) -->
+        <div class="r2" style="margin-bottom:11px">
+          <div class="fg" style="margin:0">
+            <label>Fra</label>
+            <input type="time" id="evfrom" value="15:00" oninput="autoEnd(this.value)">
+          </div>
+          <div class="fg" style="margin:0">
+            <label>Til</label>
+            <input type="time" id="evto" value="16:00">
+          </div>
+        </div>
+
+        <!-- Gentagelse -->
+        <div class="fg">
+          <label>Gentagelse</label>
+          <div class="rec-box">
+            <select id="rectype" onchange="updRecUI()">
+              <option value="none">Ingen gentagelse</option>
+              <option value="weekly">Ugentligt</option>
+              <option value="daily">Dagligt</option>
+              <option value="monthly">Månedligt</option>
+              <option value="yearly">Årligt</option>
+            </select>
+            <div class="rec-sub hidden" id="recsub">
+              <div>
+                <label style="margin-top:8px">Slutter</label>
+                <select id="recend" onchange="updRecEnd()">
+                  <option value="never">Aldrig</option>
+                  <option value="count">Efter antal</option>
+                  <option value="until">På dato</option>
+                </select>
+              </div>
+              <div id="reccw">
+                <label style="margin-top:8px">Antal gange</label>
+                <input type="number" id="reccount" value="10" min="1" max="365">
+              </div>
+              <div id="recuw" class="hidden" style="grid-column:1/-1">
+                <label style="margin-top:8px">Slutdato</label>
+                <input type="date" id="recuntil">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fg">
+          <label>Bemærkninger</label>
+          <textarea id="evnotes" rows="2" style="resize:vertical" placeholder="Ekstra info..."></textarea>
+        </div>
+        <button class="sbtn" onclick="saveManual()">💾 Gem begivenhed</button>
+      </div>
+
+      <!-- ─── BILLEDE ─── -->
+      <div class="pnl" id="pnl-image">
+        <!-- API key banner — shown when no key is stored -->
+        <div class="key-banner" id="img-keybanner">
+          <p>🔑 API nøgle kræves til AI-analyse</p>
+          <input type="password" id="img-apikey" placeholder="sk-ant-api03-..." oninput="syncKey(this.value)" autocomplete="off">
+          <small>Nøglen gemmes kun lokalt i din browser og bruges til at analysere billeder med AI.</small>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted);margin-bottom:10px">Upload et screenshot fra en plan eller app – AI finder begivenheden automatisk.</p>
+        <img id="pimg" class="pimg" alt="">
+
+        <!--
+          FIX for iOS: input[type=file] is placed INSIDE .uzone with position:absolute;inset:0
+          The whole zone is therefore natively tappable — no programmatic .click() needed.
+          display:none / visibility:hidden would break iOS file selection.
+        -->
+        <div class="uzone" id="uzone"
+          ondragover="event.preventDefault();this.classList.add('over')"
+          ondragleave="this.classList.remove('over')"
+          ondrop="dropFile(event)">
+          <input type="file" id="fin" accept="image/*" onchange="handleImg(event)">
+          <div class="uico">📷</div>
+          <div class="utxt">Tryk eller træk billede hertil</div>
+          <div class="uhint">PNG, JPG, screenshot</div>
+        </div>
+
+        <div class="aicard" id="imgres"></div>
+        <button class="sbtn hidden" id="saveimg" onclick="saveAI()">💾 Gem begivenhed</button>
+      </div>
+
+      <!-- ─── STEMME / TEKST AI ─── -->
+      <div class="pnl" id="pnl-voice">
+        <!-- API key banner -->
+        <div class="key-banner" id="voice-keybanner">
+          <p>🔑 API nøgle kræves til AI-analyse</p>
+          <input type="password" id="voice-apikey" placeholder="sk-ant-api03-..." oninput="syncKey(this.value)" autocomplete="off">
+          <small>Nøglen gemmes kun lokalt i din browser og bruges til at fortolke tekst med AI.</small>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted);margin-bottom:10px">
+          Brug mikrofonen <strong>eller</strong> skriv en sætning – AI opretter begivenheden.<br>
+          <em style="font-size:11px">Eks: "Håndbold træning fredag kl 16 til 18 i hallen"</em>
+        </p>
+
+        <div class="voice-area">
+          <button class="micbtn" id="micbtn" onclick="toggleMic()">🎤</button>
+          <div class="micst" id="micst">Tryk for at tale (kræver Chrome + HTTPS)</div>
+        </div>
+
+        <div class="divider">eller skriv</div>
+
+        <div class="fg">
+          <label>Beskriv begivenheden</label>
+          <textarea id="voicetxt" rows="3" placeholder="Håndbold træning fredag kl 16 til 18 i hallen..."></textarea>
+        </div>
+        <button class="sbtn sec" onclick="parseText()">🤖 Analyser med AI</button>
+
+        <div class="aicard" id="voiceres"></div>
+        <button class="sbtn hidden" id="savevoice" onclick="saveAI()">💾 Gem begivenhed</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════
+//  CONFIG
+// ═══════════════════════════════
+const ACTS = {
+  handball: { name: 'Håndbold træning', color: '#FF6B35', emoji: '🤾' },
+  football: { name: 'Fodbold træning',  color: '#3FB950', emoji: '⚽' },
+  gym:      { name: 'Gym',              color: '#F778BA', emoji: '💪' },
+  referee:  { name: 'Håndbold dommer', color: '#D4A017', emoji: '🟡' },
+  social:   { name: 'Sociale events',   color: '#A371F7', emoji: '🎉' },
+  homework: { name: 'Lektier',          color: '#58A6FF', emoji: '📚' },
+  other:    { name: 'Andet',            color: '#6E7681', emoji: '📌' },
+};
+
+const DA_S  = ['Søn','Man','Tirs','Ons','Tors','Fre','Lør'];
+const DA_FL = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
+const DA_M  = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
+const SH = 6, EH = 23, HPX = 60;
+
+// ═══════════════════════════════
+//  STATE
+// ═══════════════════════════════
+let events = JSON.parse(localStorage.getItem('kal_ev') || '[]');
+let view   = 'week';
+let cur    = new Date();
+let selAct = 'handball';
+let aiPay  = null; // last parsed AI event — shared between image+voice tabs
+
+// ═══════════════════════════════
+//  API KEY — single source of truth in localStorage
+// ═══════════════════════════════
+function getKey() { return localStorage.getItem('kal_key') || ''; }
+
+function syncKey(val) {
+  // Keep all key inputs in sync and persist
+  localStorage.setItem('kal_key', val.trim());
+  ['img-apikey','voice-apikey'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value !== val) el.value = val;
+  });
+  refreshKeyBanners();
+}
+
+function refreshKeyBanners() {
+  const hasKey = !!getKey();
+  // Hide banners when key is set
+  ['img-keybanner','voice-keybanner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = hasKey ? 'none' : 'block';
+  });
+}
+
+// ═══════════════════════════════
+//  INIT
+// ═══════════════════════════════
+function init() {
+  buildLegend();
+  buildActGrid();
+  resetForm();
+
+  // Populate key inputs if already saved
+  const k = getKey();
+  if (k) {
+    ['img-apikey','voice-apikey'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = k;
+    });
+  }
+  refreshKeyBanners();
+  render();
+}
+
+function buildLegend() {
+  document.getElementById('legend').innerHTML =
+    Object.entries(ACTS).map(([, a]) =>
+      `<div class="li"><div class="ldot" style="background:${a.color}"></div>${a.emoji} ${a.name}</div>`
+    ).join('');
+}
+
+function buildActGrid() {
+  document.getElementById('actgrid').innerHTML =
+    Object.entries(ACTS).map(([k, a]) =>
+      `<div class="aopt ${k === selAct ? 'sel' : ''}" style="${k === selAct ? `--sc:${a.color}` : ''}" onclick="pickAct('${k}',this)">
+         <div class="adot" style="background:${a.color}"></div>${a.emoji} ${a.name}
+       </div>`
+    ).join('');
+}
+
+function pickAct(k, el) {
+  selAct = k;
+  document.querySelectorAll('.aopt').forEach(o => { o.classList.remove('sel'); o.style.removeProperty('--sc'); });
+  el.classList.add('sel');
+  el.style.setProperty('--sc', ACTS[k].color);
+}
+
+function resetForm() {
+  document.getElementById('evdate').value   = fmt(new Date());
+  document.getElementById('evfrom').value   = '15:00';
+  document.getElementById('evto').value     = '16:00';
+  document.getElementById('evloc').value    = '';
+  document.getElementById('evnotes').value  = '';
+  document.getElementById('rectype').value  = 'none';
+  document.getElementById('recsub').classList.add('hidden');
+  document.getElementById('voicetxt').value = '';
+}
+
+// ═══════════════════════════════
+//  VIEW / NAV
+// ═══════════════════════════════
+function setView(v) {
+  view = v;
+  document.querySelectorAll('.vbtn').forEach((b, i) =>
+    b.classList.toggle('on', (i === 0 && v === 'week') || (i === 1 && v === 'month'))
+  );
+  render();
+}
+function navigate(d) {
+  if (view === 'week') cur = new Date(cur.getTime() + d * 7 * 864e5);
+  else cur = new Date(cur.getFullYear(), cur.getMonth() + d, 1);
+  render();
+}
+function render() { view === 'week' ? renderWeek() : renderMonth(); }
+
+// ═══════════════════════════════
+//  RECURRING — expand events into instances within [rs, re]
+// ═══════════════════════════════
+function getInst(rs, re) {
+  const out = [];
+  for (const ev of events) {
+    const rec = ev.recurrence || { type: 'none' };
+    let d = new Date(ev.date + 'T12:00:00');
+    if (rec.type === 'none') {
+      if (d >= rs && d <= re) out.push({ ...ev, _oid: ev.id, _inst: ev.date });
+      continue;
+    }
+    let iter = 0, cnt = 0;
+    const until = rec.until ? new Date(rec.until + 'T23:59:59') : null;
+    while (d <= re && iter < 800) {
+      iter++;
+      const ds = fmt(d);
+      if (d >= rs && !(ev.exceptions || []).includes(ds))
+        out.push({ ...ev, date: ds, _oid: ev.id, _inst: ds });
+      cnt++;
+      if (rec.count && cnt >= rec.count) break;
+      if (until && d >= until) break;
+      d = adv(d, rec.type, rec.interval || 1);
+    }
+  }
+  return out;
+}
+
+function adv(d, t, n) {
+  const x = new Date(d);
+  if (t === 'daily')   x.setDate(x.getDate() + n);
+  if (t === 'weekly')  x.setDate(x.getDate() + n * 7);
+  if (t === 'monthly') x.setMonth(x.getMonth() + n);
+  if (t === 'yearly')  x.setFullYear(x.getFullYear() + n);
+  return x;
+}
+
+function isoWk(d) {
+  const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = x.getUTCDay() || 7;
+  x.setUTCDate(x.getUTCDate() + 4 - day);
+  const y1 = new Date(Date.UTC(x.getUTCFullYear(), 0, 1));
+  return Math.ceil((((x - y1) / 864e5) + 1) / 7);
+}
+
+// ═══════════════════════════════
+//  WEEK VIEW — Mon–Sun, all 7 days
+// ═══════════════════════════════
+function renderWeek() {
+  const mon   = getMon(cur);
+  const days  = Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+  const last  = days[6];
+  const today = new Date();
+
+  document.getElementById('ntitle').innerHTML =
+    `Uge ${isoWk(mon)} &nbsp;·&nbsp; ${mon.getDate()} ${DA_M[mon.getMonth()].slice(0,3)} – ${last.getDate()} ${DA_M[last.getMonth()].slice(0,3)} ${last.getFullYear()}`;
+
+  const rs  = new Date(mon); rs.setHours(0, 0, 0, 0);
+  const re  = new Date(last); re.setHours(23, 59, 59, 999);
+  const evs = getInst(rs, re);
+  const hrs = Array.from({ length: EH - SH }, (_, i) => SH + i);
+
+  // Time column — sticky left; corner cell also sticky top
+  let tc = `<div class="tcol"><div class="tch"></div>`;
+  hrs.forEach(h => tc += `<div class="tsl">${pad(h)}:00</div>`);
+  tc += `</div>`;
+
+  // Day columns — day headers sticky top
+  // di=0→Mon, di=6→Sun; DA_S[0]=Søn,DA_S[1]=Man ... DA_S[6]=Lør
+  let dc = `<div class="dcols">`;
+  days.forEach((d, di) => {
+    const ds   = fmt(d);
+    const isT  = d.toDateString() === today.toDateString();
+    const dName = DA_S[(di + 1) % 7]; // Mon→DA_S[1], ... Sun→DA_S[0]
+    const dev  = evs.filter(e => e.date === ds);
+
+    dc += `<div class="dcol">
+      <div class="dh ${isT ? 'today' : ''}">
+        <div class="dn">${dName}</div>
+        <div class="dd">${d.getDate()}</div>
+      </div>
+      <div class="dbody">`;
+
+    hrs.forEach(h => dc += `<div class="hrow" onclick="openModalAt('${ds}','${pad(h)}:00')"></div>`);
+
+    dev.forEach(ev => {
+      const a   = ACTS[ev.activity] || ACTS.other;
+      const top = ty(ev.timeStart || `${SH}:00`);
+      const bot = ty(ev.timeEnd   || ah(ev.timeStart || `${SH}:00`, 1));
+      const ht  = Math.max(bot - top, 22);
+      const isR = ev.recurrence && ev.recurrence.type !== 'none';
+      dc += `<div class="wev"
+        style="top:${top}px;height:${ht}px;background:${a.color}22;border-left-color:${a.color};color:${a.color}"
+        onclick="event.stopPropagation();showPop(event,'${ev._oid}','${ev._inst}')">
+        <div class="wev-nm">${a.emoji} ${a.name}${isR ? ' ↻' : ''}</div>
+        <div class="wev-t">${ev.timeStart || ''}${ev.timeEnd ? ' – ' + ev.timeEnd : ''}</div>
+      </div>`;
+    });
+
+    dc += `</div></div>`;
+  });
+  dc += `</div>`;
+
+  document.getElementById('cal').innerHTML =
+    `<div class="wscroll"><div class="wouter">${tc}${dc}</div></div>`;
+}
+
+function ty(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return (h - SH) * HPX + (m / 60) * HPX;
+}
+function getMon(d) {
+  const dt = new Date(d), day = dt.getDay();
+  dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1));
+  return dt;
+}
+
+// ═══════════════════════════════
+//  MONTH VIEW
+// ═══════════════════════════════
+function renderMonth() {
+  const yr = cur.getFullYear(), mo = cur.getMonth();
+  document.getElementById('ntitle').textContent = `${DA_M[mo]} ${yr}`;
+
+  const first = new Date(yr, mo, 1), dow = first.getDay();
+  const start = new Date(first);
+  start.setDate(first.getDate() - (dow === 0 ? 6 : dow - 1));
+  const re  = new Date(start); re.setDate(start.getDate() + 42);
+  const evs = getInst(start, re);
+  const today = new Date();
+
+  let h = `<div class="mwrap"><div class="mgrid">
+    <div class="mhdr" style="font-size:9px">Uge</div>`;
+  ['Man','Tirs','Ons','Tors','Fre','Lør','Søn'].forEach(x => h += `<div class="mhdr">${x}</div>`);
+
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    if (i % 7 === 0) h += `<div class="wkn">${isoWk(d)}</div>`;
+    const ds  = fmt(d);
+    const dim = d.getMonth() !== mo;
+    const isT = d.toDateString() === today.toDateString();
+    const dev = evs.filter(e => e.date === ds);
+
+    h += `<div class="mday ${dim?'dim':''} ${isT?'today':''}" onclick="openModalAt('${ds}')">
+      <div class="dnum">${d.getDate()}</div>`;
+    dev.slice(0, 3).forEach(ev => {
+      const a  = ACTS[ev.activity] || ACTS.other;
+      const isR = ev.recurrence && ev.recurrence.type !== 'none';
+      h += `<div class="mev" style="background:${a.color}28;color:${a.color}"
+        onclick="event.stopPropagation();showPop(event,'${ev._oid}','${ev._inst}')">
+        ${a.emoji} ${ev.timeStart ? ev.timeStart + ' ' : ''}${a.name}${isR ? ' ↻' : ''}
+      </div>`;
+    });
+    if (dev.length > 3) h += `<div class="mmore">+${dev.length-3} mere</div>`;
+    h += `</div>`;
+  }
+  h += `</div></div>`;
+  document.getElementById('cal').innerHTML = h;
+}
+
+// ═══════════════════════════════
+//  MODAL
+// ═══════════════════════════════
+function openModal() {
+  refreshKeyBanners();
+  document.getElementById('overlay').classList.add('show');
+}
+function openModalAt(date, time) {
+  document.getElementById('evdate').value = date;
+  if (time) { document.getElementById('evfrom').value = time; autoEnd(time); }
+  switchTab('manual');
+  openModal();
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('imgres').classList.remove('show');
+  document.getElementById('voiceres').classList.remove('show');
+  document.getElementById('saveimg').classList.add('hidden');
+  document.getElementById('savevoice').classList.add('hidden');
+  document.getElementById('pimg').style.display = 'none';
+  aiPay = null;
+}
+function ocl(e) { if (e.target === document.getElementById('overlay')) closeModal(); }
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  document.querySelectorAll('.pnl').forEach(p => p.classList.toggle('on', p.id === `pnl-${t}`));
+  refreshKeyBanners();
+}
+
+function autoEnd(v) {
+  if (!v) return;
+  const [h, m] = v.split(':').map(Number);
+  if (h + 1 <= 23) document.getElementById('evto').value = `${pad(h+1)}:${pad(m)}`;
+}
+function updRecUI() {
+  document.getElementById('recsub').classList.toggle('hidden', document.getElementById('rectype').value === 'none');
+}
+function updRecEnd() {
+  const v = document.getElementById('recend').value;
+  document.getElementById('reccw').classList.toggle('hidden', v !== 'count');
+  document.getElementById('recuw').classList.toggle('hidden', v !== 'until');
+}
+
+// ═══════════════════════════════
+//  SAVE
+// ═══════════════════════════════
+function saveManual() {
+  const date  = document.getElementById('evdate').value;
+  const from  = document.getElementById('evfrom').value;
+  const to    = document.getElementById('evto').value;
+  const loc   = document.getElementById('evloc').value.trim();
+  const notes = document.getElementById('evnotes').value.trim();
+  if (!date) { alert('Vælg venligst en dato.'); return; }
+
+  const rt = document.getElementById('rectype').value;
+  let rec = { type: rt };
+  if (rt !== 'none') {
+    const re = document.getElementById('recend').value;
+    if (re === 'count') rec.count = parseInt(document.getElementById('reccount').value) || 10;
+    if (re === 'until') rec.until = document.getElementById('recuntil').value;
+  }
+
+  addEv({ activity: selAct, date, timeStart: from, timeEnd: to, location: loc, notes, recurrence: rec });
+  closeModal();
+  render();
+}
+
+function saveAI() {
+  if (!aiPay) return;
+  aiPay.recurrence = { type: 'none' };
+  addEv(aiPay);
+  closeModal();
+  render();
+}
+
+function addEv(data) {
+  events.push({ id: Date.now() + Math.random().toString(36).slice(2), ...data });
+  localStorage.setItem('kal_ev', JSON.stringify(events));
+}
+
+function delInst(oid, inst) {
+  const ev = events.find(e => e.id === oid); if (!ev) return;
+  ev.exceptions = ev.exceptions || [];
+  ev.exceptions.push(inst);
+  localStorage.setItem('kal_ev', JSON.stringify(events));
+  document.querySelector('.evpop')?.remove();
+  render();
+}
+
+function delAll(oid) {
+  events = events.filter(e => e.id !== oid);
+  localStorage.setItem('kal_ev', JSON.stringify(events));
+  document.querySelector('.evpop')?.remove();
+  render();
+}
+
+// ═══════════════════════════════
+//  EVENT POPUP
+// ═══════════════════════════════
+function showPop(e, oid, inst) {
+  const ev = events.find(x => x.id === oid); if (!ev) return;
+  const a  = ACTS[ev.activity] || ACTS.other;
+  const isR = ev.recurrence && ev.recurrence.type !== 'none';
+  const rl  = { none:'', daily:'Dagligt', weekly:'Ugentligt', monthly:'Månedligt', yearly:'Årligt' };
+
+  document.querySelector('.evpop')?.remove();
+  const pop = document.createElement('div');
+  pop.className = 'evpop';
+  const px = Math.min(e.clientX + 8, window.innerWidth - 260);
+  const py = Math.min(e.clientY + 8, window.innerHeight - 230);
+  pop.style.cssText = `left:${px}px;top:${py}px`;
+  pop.innerHTML = `
+    <div class="ep-t" style="color:${a.color}">${a.emoji} ${a.name}</div>
+    <div class="ep-r">📅 ${niceD(inst || ev.date)}</div>
+    ${ev.timeStart ? `<div class="ep-r">🕒 ${ev.timeStart}${ev.timeEnd ? ' – ' + ev.timeEnd : ''}</div>` : ''}
+    ${ev.location  ? `<div class="ep-r">📍 ${ev.location}</div>` : ''}
+    ${ev.notes     ? `<div class="ep-r">📝 ${ev.notes}</div>` : ''}
+    ${isR          ? `<div class="ep-rc">↻ ${rl[ev.recurrence.type]}</div>` : ''}
+    <div class="ep-acts">
+      ${isR
+        ? `<div class="ep-row">
+             <button class="epb del" onclick="delInst('${oid}','${inst}')">🗑 Kun denne</button>
+             <button class="epb del" onclick="delAll('${oid}')">🗑 Alle</button>
+           </div>`
+        : `<button class="epb del" onclick="delAll('${oid}')">🗑 Slet begivenhed</button>`}
+      <button class="epb" onclick="document.querySelector('.evpop')?.remove()">Luk</button>
+    </div>`;
+  document.body.appendChild(pop);
+  setTimeout(() => {
+    function h(ev) { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('click', h); } }
+    document.addEventListener('click', h);
+  }, 80);
+}
+
+// ═══════════════════════════════
+//  AI — IMAGE
+//  The file input sits inside .uzone with position:absolute;inset:0
+//  so the user taps anywhere on the zone to open the file picker.
+//  No .click() needed — avoids iOS restrictions entirely.
+// ═══════════════════════════════
+function dropFile(e) {
+  e.preventDefault();
+  document.getElementById('uzone').classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) procImg(f);
+}
+
+function handleImg(e) {
+  const f = e.target.files[0];
+  if (f) procImg(f);
+  // Reset so same file can be re-selected
+  e.target.value = '';
+}
+
+async function procImg(file) {
+  const key = getKey();
+  if (!key) {
+    document.getElementById('imgres').classList.add('show');
+    document.getElementById('imgres').innerHTML = '⚠️ Indtast din API nøgle i feltet ovenfor.';
+    return;
+  }
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const pi = document.getElementById('pimg');
+    pi.src = ev.target.result;
+    pi.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+
+  const res = document.getElementById('imgres');
+  res.classList.add('show');
+  res.innerHTML = '<span class="spin"></span> AI analyserer billedet...';
+  document.getElementById('saveimg').classList.add('hidden');
+  aiPay = null;
+
+  try {
+    const b64  = await b64f(file);
+    const data = await callAI(key, [
+      { type: 'image', source: { type: 'base64', media_type: file.type, data: b64 } },
+      { type: 'text',  text: `Analyser billedet og udtræk begivenhedsinformation.
+Returner KUN valid JSON (ingen markdown, ingen forklaring):
+{"events":[{"activity":"handball|football|gym|referee|social|homework|other","date":"YYYY-MM-DD","timeStart":"HH:MM","timeEnd":"HH:MM","location":"","notes":""}]}
+Aktiviteter: handball=håndbold, football=fodbold, gym=fitness/styrke, referee=håndbold dommer, social=fest/hygge, homework=lektier, other=andet.
+Brug dato ${fmt(new Date())} hvis dato ikke er synlig. KUN JSON.` },
+    ]);
+    const txt = data.content.find(c => c.type === 'text')?.text || '';
+    const p   = JSON.parse(txt.replace(/```json|```/g, '').trim());
+    if (p.events && p.events.length > 0) {
+      aiPay = p.events[0];
+      showAICard(res, aiPay);
+      document.getElementById('saveimg').classList.remove('hidden');
+    } else {
+      res.innerHTML = '❌ Ingen begivenheder fundet. Prøv et andet billede.';
+    }
+  } catch (err) {
+    res.innerHTML = `❌ Fejl: ${err.message}`;
+    console.error('Image AI error:', err);
+  }
+}
+
+// ═══════════════════════════════
+//  AI — TEKST / STEMME
+// ═══════════════════════════════
+async function parseText() {
+  const txt = document.getElementById('voicetxt').value.trim();
+  if (!txt) { alert('Skriv venligst en beskrivelse af begivenheden.'); return; }
+  await parseNL(txt);
+}
+
+let recog = null, isRec = false;
+function toggleMic() { isRec ? stopMic() : startMic(); }
+
+function startMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    document.getElementById('micst').textContent = '❌ Ikke understøttet – skriv i feltet nedenfor';
+    return;
+  }
+  recog = new SR();
+  recog.lang = 'da-DK';
+  recog.continuous = false;
+  recog.interimResults = false;
+  recog.onresult = async ev => {
+    const t = ev.results[0][0].transcript;
+    document.getElementById('micst').textContent = `"${t}"`;
+    document.getElementById('voicetxt').value = t;
+    stopMic();
+    await parseNL(t);
+  };
+  recog.onerror = err => {
+    const msgs = { 'not-allowed': '🔒 Mikrofon-adgang nægtet', 'network': '❌ Netværksfejl', 'no-speech': '🤫 Ingen tale – prøv igen' };
+    document.getElementById('micst').textContent = msgs[err.error] || '❌ Fejl – skriv i feltet nedenfor';
+    stopMic();
+  };
+  recog.start();
+  isRec = true;
+  document.getElementById('micbtn').classList.add('rec');
+  document.getElementById('micst').textContent = '🔴 Optager... tal nu';
+}
+
+function stopMic() {
+  recog?.stop();
+  isRec = false;
+  document.getElementById('micbtn').classList.remove('rec');
+}
+
+async function parseNL(text) {
+  const key = getKey();
+  if (!key) {
+    document.getElementById('voiceres').classList.add('show');
+    document.getElementById('voiceres').innerHTML = '⚠️ Indtast din API nøgle i feltet ovenfor.';
+    return;
+  }
+
+  const res = document.getElementById('voiceres');
+  res.classList.add('show');
+  res.innerHTML = '<span class="spin"></span> AI fortolker...';
+  document.getElementById('savevoice').classList.add('hidden');
+  aiPay = null;
+
+  try {
+    const td   = new Date();
+    const data = await callAI(key, [{
+      type: 'text',
+      text: `Fortolk denne danske tekst og udtræk én begivenhed.
+Dato i dag: ${fmt(td)} (${DA_FL[td.getDay()]}).
+Tekst: "${text}"
+Returner KUN valid JSON (ingen markdown, ingen forklaring):
+{"activity":"handball|football|gym|referee|social|homework|other","date":"YYYY-MM-DD","timeStart":"HH:MM","timeEnd":"HH:MM","location":"","notes":""}
+Aktiviteter: handball=håndbold, football=fodbold, gym=fitness/styrke, referee=håndbold dommer, social=fest/hygge, homework=lektier, other=andet.
+Beregn næste forekomst af nævnt ugedag fra i dag. Hvis ingen sluttid nævnes: timeEnd = timeStart + 1 time.
+KUN JSON.`,
+    }]);
+    const txt = data.content.find(c => c.type === 'text')?.text || '';
+    aiPay = JSON.parse(txt.replace(/```json|```/g, '').trim());
+    showAICard(res, aiPay);
+    document.getElementById('savevoice').classList.remove('hidden');
+  } catch (err) {
+    res.innerHTML = `❌ Fejl: ${err.message}`;
+    console.error('Voice AI error:', err);
+  }
+}
+
+function showAICard(el, pay) {
+  const a = ACTS[pay.activity] || ACTS.other;
+  el.innerHTML = `<strong style="color:${a.color}">${a.emoji} ${a.name}</strong><br>
+    📅 ${niceD(pay.date)}<br>
+    🕒 ${pay.timeStart || '?'} – ${pay.timeEnd || '?'}<br>
+    📍 ${pay.location || 'Ikke angivet'}`;
+}
+
+// ═══════════════════════════════
+//  ANTHROPIC API
+// ═══════════════════════════════
+async function callAI(key, content) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-5',
+      max_tokens: 512,
+      messages: [{ role: 'user', content }],
+    }),
+  });
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  return d;
+}
+
+// ═══════════════════════════════
+//  UTILS
+// ═══════════════════════════════
+function fmt(d)    { return d.toISOString().split('T')[0]; }
+function pad(n)    { return String(n).padStart(2, '0'); }
+function ah(t, h)  { const [hr, m] = t.split(':').map(Number); return `${pad(Math.min(hr+h, 23))}:${pad(m)}`; }
+function niceD(ds) { const d = new Date(ds + 'T12:00:00'); return `${d.getDate()}. ${DA_M[d.getMonth()]} ${d.getFullYear()}`; }
+function b64f(f)   {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(f);
+  });
+}
+
+init();
+</script>
+</body>
+</html>
