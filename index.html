@@ -146,24 +146,7 @@
     .sbtn:hover { opacity: .85; }
     .sbtn.sec { background: var(--surf2); color: var(--text); border: 1px solid var(--bdr); margin-bottom: 8px; margin-top: 0; }
 
-    /* ── UPLOAD ZONE
-       FIX: The <input type=file> is placed INSIDE the zone with
-       position:absolute; inset:0; opacity:0; cursor:pointer
-       This makes the entire zone tappable on iOS — no programmatic .click() needed.
-    ── */
-    .uzone {
-      position: relative;          /* contains the absolutely-placed input */
-      border: 2px dashed var(--bdr); border-radius: 10px;
-      padding: 26px 16px; text-align: center;
-      transition: all .15s; margin-bottom: 11px;
-      cursor: pointer;
-    }
-    .uzone:hover, .uzone.over { border-color: var(--acc); background: rgba(255,107,53,.05); }
-    .uzone input[type=file] {
-      /* Covers entire zone, invisible — most reliable cross-browser/iOS approach */
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      opacity: 0; cursor: pointer;
-      /* Must NOT be display:none or visibility:hidden — iOS ignores those */
+ ignores those */
     }
     .uico { font-size: 28px; margin-bottom: 5px; pointer-events: none; }
     .utxt { font-size: 13px; color: var(--muted); pointer-events: none; }
@@ -730,6 +713,8 @@ function saveAI() {
   if (!aiPay) return;
   aiPay.recurrence = { type: 'none' };
   addEv(aiPay);
+  // Navigate to the week/month containing the saved event so user can see it
+  if (aiPay.date) cur = new Date(aiPay.date + 'T12:00:00');
   closeModal();
   render();
 }
